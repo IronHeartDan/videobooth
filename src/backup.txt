@@ -1,0 +1,365 @@
+const [cameraOn, setCameraOn] = useState(false);
+  const [micOn, setMicOn] = useState(false);
+  const [currentCam, setCurrentCam] = useState(null);
+  const [currentMic, setCurrentMic] = useState(null);
+
+  const [isOnCall, setOnCall] = useState(false);
+
+  const [bigVideoStream, setPreviewStream] = useState(null);
+
+  const getVideoStream = useCallback(async () => {
+    let constraints = currentCam
+      ? {
+          video: {
+            deviceId: currentCam,
+          },
+        }
+      : { video: true };
+
+    let stream = await navigator.mediaDevices.getUserMedia(constraints);
+    return stream;
+  }, [currentCam]);
+
+  const getAudioStream = useCallback(async () => {
+    let constraints = currentMic
+      ? {
+          video: {
+            deviceId: currentMic,
+          },
+        }
+      : { audio: true };
+
+    let stream = await navigator.mediaDevices.getUserMedia(constraints);
+    return stream;
+  }, [currentMic]);
+
+  const turnCameraOff = useCallback(() => {
+    let bigVideo = document.getElementById("bigVideo");
+    bigVideo.pause();
+    bigVideo.srcObject = null;
+    setPreviewStream(null);
+    setCameraOn(false);
+  }, []);
+
+  const turnCameraOn = useCallback(async () => {
+    let bigVideo = document.getElementById("bigVideo");
+    let stream = await getVideoStream();
+    bigVideo.srcObject = stream;
+    setPreviewStream(stream);
+  }, [getVideoStream]);
+
+  useEffect(() => {
+    let videoDevices = document.getElementById("cameraDevices");
+    let audioDevices = document.getElementById("audioDevices");
+
+    videoDevices.addEventListener("change", async (e) => {
+      if (e.target.value !== "0") {
+        setCurrentCam(e.target.value);
+        turnCameraOff();
+        turnCameraOn();
+      }
+    });
+  }, [turnCameraOn, turnCameraOff]);
+
+  useEffect(() => {
+    async function init() {
+      let finish = document.getElementById("finish");
+      finish.disabled = true;
+      let bigVideo = document.getElementById("bigVideo");
+      let videoDevices = document.getElementById("cameraDevices");
+      let audioDevices = document.getElementById("audioDevices");
+
+      bigVideo.onplay = () => {
+        setCameraOn(true);
+      };
+
+      let cameraPermission = await navigator.permissions.query({
+        name: "camera",
+      });
+      let micPermission = await navigator.permissions.query({
+        name: "microphone",
+      });
+
+      let status = { camera: cameraPermission.state, mic: micPermission.state };
+
+      if (status.camera === "prompt" || "granted") {
+        let stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        bigVideo.srcObject = stream;
+        let devices = await navigator.mediaDevices.enumerateDevices();
+        devices = devices.filter((device) => device.kind === "videoinput");
+        devices.forEach((device) => {
+          let opt = document.createElement("option");
+          opt.innerText = device.label;
+          opt.value = device.deviceId;
+          videoDevices.appendChild(opt);
+        });
+        videoDevices.focus();
+      }
+
+      if (status.mic === "prompt" || "granted") {
+        let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getAudioTracks().forEach(function (track) {
+          track.stop();
+        });
+        let devices = await navigator.mediaDevices.enumerateDevices();
+        devices = devices.filter((device) => device.kind === "audioinput");
+        devices.forEach((device) => {
+          let opt = document.createElement("option");
+          opt.innerText = device.label;
+          opt.value = device.deviceId;
+          audioDevices.appendChild(opt);
+        });
+      }
+    }
+    init();
+    console.log("Initing");
+  }, []);
+
+  const [connectionSocket, setConnectionSocket] = useState(null);
+  const [signalSocket, setSignalSocket] = useState(null);
+  const [isSearching, setSearching] = useState(false);
+
+  useEffect(() => {
+    let socket = io("http://localhost:5000");
+    // let socket = io("https://videobooth-backend.herokuapp.com");
+    setConnectionSocket(socket);
+    let finish = document.getElementById("finish");
+    socket.on("userNameExists", (check) => {
+      setSearching(false);
+      if (check) {
+        setInValid(true);
+        finish.disabled = true;
+      } else {
+        setInValid(false);
+        finish.disabled = false;
+      }
+    });
+  }, []);
+
+  const [setUp, setSetUp] = useState(true);
+  const [userName, setUserName] = useState(null);
+  const [isInValid, setInValid] = useState(false);
+
+  const checkUserName = (e) => {
+    setSearching(true);
+    let finish = document.getElementById("finish");
+    finish.disabled = true;
+
+    if (e.target.value.length >= 3 && connectionSocket) {
+      setUserName(e.target.value);
+      connectionSocket.emit("checkUserName", e.target.value);
+    } else {
+      setUserName(null);
+      setSearching(false);
+    }
+  };
+
+  const setUser = () => {
+    let socket = io(`http://localhost:5000?userName=${userName}`);
+    // let socket = io(`https://videobooth-backend.herokuapp.com?userName=${userName}`);
+    setSignalSocket(socket);
+    connectionSocket.disconnect();
+  };
+
+  // Web-RTC by Danish Khan
+
+  const requestCall = async () => {
+    //Request Call
+    signalSocket.emit("callRequest");
+    console.log("Call Requested");
+
+    // Waiting For Response
+    signalSocket.on("callAccepted", () => {
+      console.log("Call Accepted");
+      setOnCall(true);
+      performConnection(0);
+    });
+  };
+
+  const answerCall = () => {
+    //Send Response
+    signalSocket.emit("acceptCall");
+    setOnCall(true);
+    performConnection(1);
+  };
+
+  const performConnection = async (type) => {
+    // let configuration = {
+    //   iceServers: [
+    //     { urls: "stun:stun.l.google.com:19302" },
+    //     {
+    //       urls: "turn:numb.viagenie.ca",
+    //       username: "webrtc@live.com",
+    //       credential: "muazkh",
+    //     },
+    //   ],
+    // };
+
+    let configuration = {
+      iceServers: [
+        { url: "stun:stun01.sipphone.com" },
+        { url: "stun:stun.ekiga.net" },
+        { url: "stun:stun.fwdnet.net" },
+        { url: "stun:stun.ideasip.com" },
+        { url: "stun:stun.iptel.org" },
+        { url: "stun:stun.rixtelecom.se" },
+        { url: "stun:stun.schlund.de" },
+        { url: "stun:stun.l.google.com:19302" },
+        { url: "stun:stun1.l.google.com:19302" },
+        { url: "stun:stun2.l.google.com:19302" },
+        { url: "stun:stun3.l.google.com:19302" },
+        { url: "stun:stun4.l.google.com:19302" },
+        { url: "stun:stunserver.org" },
+        { url: "stun:stun.softjoys.com" },
+        { url: "stun:stun.voiparound.com" },
+        { url: "stun:stun.voipbuster.com" },
+        { url: "stun:stun.voipstunt.com" },
+        { url: "stun:stun.voxgratia.org" },
+        { url: "stun:stun.xten.com" },
+        {
+          url: "turn:numb.viagenie.ca",
+          credential: "muazkh",
+          username: "webrtc@live.com",
+        },
+        {
+          url: "turn:192.158.29.39:3478?transport=udp",
+          credential: "JZEOEt2V3Qb0y27GRntt2u2PAYA=",
+          username: "28224511:1379330808",
+        },
+        {
+          url: "turn:192.158.29.39:3478?transport=tcp",
+          credential: "JZEOEt2V3Qb0y27GRntt2u2PAYA=",
+          username: "28224511:1379330808",
+        },
+      ],
+    };
+
+    // Init Caller RTC
+    let rtcClient = new RTCPeerConnection(configuration);
+
+    // // Set Video Stream
+    let videostream = await getVideoStream();
+    videostream.getTracks().forEach((track) => {
+      rtcClient.addTrack(track, videostream);
+    });
+
+    // Set Audio Stream
+    let audioStream = await getAudioStream();
+    audioStream.getTracks().forEach((track) => {
+      rtcClient.addTrack(track, audioStream);
+    });
+
+    // Set Stream
+    // let localStream = await navigator.mediaDevices.getUserMedia({
+    //   video:true,
+    //   audio: true,
+    // });
+    // localStream.getTracks().forEach((track) => {
+    //   rtcClient.addTrack(track, localStream);
+    // });
+
+    // Wait For ICEs Generation And Send
+    rtcClient.onicecandidate = (e) => {
+      console.log(`This ${e.candidate}`);
+      if (e.candidate) {
+        signalSocket.emit("transferIce", e.candidate);
+        console.log("ICE Generated And Sent");
+      }
+    };
+
+    // Wait For Remote ICEs and Set
+    signalSocket.on("transferIce", async (remoteIce) => {
+      console.log(remoteIce);
+      await rtcClient.addIceCandidate(remoteIce);
+      console.log("ICE Received And Set");
+      try {
+        await rtcClient.addIceCandidate(remoteIce);
+        console.log("ICE Received And Set");
+      } catch (error) {
+        console.log(error);
+      }
+    });
+
+    // Wait For Remote ICEs and Set
+    rtcClient.ontrack = (e) => {
+      let smallVideo = document.getElementById("smallVideo");
+      // smallVideo.srcObject = e.streams[0];
+      const [remoteStream] = e.streams;
+      console.log(remoteStream);
+      smallVideo.srcObject = remoteStream;
+    };
+
+    // Connecion Status
+
+    rtcClient.onconnectionstatechange = (e) => {
+      console.log(e.type);
+    };
+
+    console.log(`Type ${type} : ${typeof type}`);
+    switch (type) {
+      case 0:
+        console.log("Case 0");
+        // Generate Call Offer
+        let offer = await rtcClient.createOffer();
+        console.log("Call Offer Created");
+
+        // Set Local Description
+        await rtcClient.setLocalDescription(offer);
+        console.log("Local Offer Set");
+
+        // Send  Offer
+        signalSocket.emit("connectionOffer", offer);
+        console.log("Offer Sent");
+
+        // Waiting For RemoteOffer
+        signalSocket.on("connectionOffer", async (remoteOffer) => {
+          console.log("Offer Received");
+          // Set Remote Offer
+          await rtcClient.setRemoteDescription(remoteOffer);
+          console.log("Remote Offer Set");
+        });
+
+        break;
+
+      case 1:
+        console.log("Case 1");
+
+        // Waiting For RemoteOffer
+        console.log("Waiting For Offer");
+        signalSocket.on("connectionOffer", async (remoteOffer) => {
+          console.log("Offer Received");
+          // Set Remote Offer
+          await rtcClient.setRemoteDescription(remoteOffer);
+          console.log("Remote Offer Set");
+          // Generate Offer
+          let offer = await rtcClient.createAnswer();
+          console.log("Answer Offer Created");
+
+          // Set Local Description
+          await rtcClient.setLocalDescription(offer);
+          console.log("Answer Offer Set");
+
+          // Send Answer Offer
+          signalSocket.emit("connectionOffer", offer);
+          console.log("Answer Offer Sent");
+        });
+        break;
+    }
+  };
+
+  useEffect(() => {
+    if (signalSocket) {
+      signalSocket.on("registered", () => {
+        setSetUp(false);
+      });
+
+      // Listen For Calls
+      signalSocket.on("incommingCall", () => {
+        if (window.confirm("Incoming Call")) {
+          answerCall();
+        } else {
+          console.log("Call Rejected");
+        }
+      });
+    } // If
+  }, [signalSocket, answerCall]);

@@ -1,0 +1,163 @@
+<Modal show={setUp ? true : false} backdrop="static" centered>
+            <Modal.Header>
+              <Modal.Title>VideoBooth</Modal.Title>
+            </Modal.Header>
+
+            <Modal.Body className="p-4">
+              <Form.Group>
+                <Form.Label>*should be at least 3 characters</Form.Label>
+                <InputGroup hasValidation>
+                  <InputGroup.Text>@</InputGroup.Text>
+                  <Form.Control
+                    type="text"
+                    required
+                    placeholder="Enter UserName"
+                    isInvalid={isInValid}
+                    onChange={checkUserName}
+                  />
+                  <Form.Control.Feedback type="invalid">
+                    UserName Taken
+                  </Form.Control.Feedback>
+                </InputGroup>
+              </Form.Group>
+            </Modal.Body>
+
+            <Modal.Footer>
+              <BButton variant="primary" id="finish" onClick={setUser}>
+                {isSearching ? (
+                  <>
+                    <Spinner
+                      as="span"
+                      animation="border"
+                      size="sm"
+                      role="status"
+                      aria-hidden="true"
+                    />
+                    <span className="visually-hidden">Loading...</span>
+                  </>
+                ) : (
+                  <>Lets Go!</>
+                )}
+              </BButton>
+            </Modal.Footer>
+          </Modal>
+
+          <div
+            className="container-fluid position-absolute w-100 h-100 p-0"
+            style={{
+              maxHeight: "100%",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <div
+              style={{
+                flex: 1,
+                maxHeight: isOnCall ? "50%" : "unset",
+              }}
+            >
+              <video
+                className="w-100 h-100"
+                style={{
+                  maxHeight: "100%",
+                  objectFit: "contain",
+                }}
+                id="bigVideo"
+                autoPlay
+                playsInline
+              ></video>
+            </div>
+            {isOnCall ? (
+              <>
+                <div
+                  style={{
+                    flex: 1,
+                    maxHeight: "50%",
+                  }}
+                >
+                  <video
+                    className="w-100 h-100"
+                    style={{
+                      maxHeight: "100%",
+                      objectFit: "contain",
+                    }}
+                    id="smallVideo"
+                    autoPlay
+                    playsInline
+                  ></video>
+                </div>
+              </>
+            ) : (
+              <></>
+            )}
+          </div>
+
+          <div className="container-fluid vw-100 vh-100 p-0 position-relative d-flex flex-column justify-content-between">
+            <div className="row p-2  w-100 align-items-center justify-content-center">
+              <div className="col d-flex justify-content-center">
+                <select
+                  className="form-select"
+                  defaultValue="0"
+                  id="cameraDevices"
+                >
+                  <option value="0">Select Camera</option>
+                </select>
+              </div>
+              <div className="col d-flex justify-content-center">
+                <select
+                  className="form-select"
+                  defaultValue="0"
+                  id="audioDevices"
+                >
+                  <option value="0">Select Mic</option>
+                </select>
+              </div>
+            </div>
+            <div className="row p-2 g-0 w-100 align-items-center justify-content-center">
+              <div className="col d-flex justify-content-center">
+                {cameraOn ? (
+                  <>
+                    <Button onClick={turnCameraOff}>
+                      <VideocamIcon />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button onClick={turnCameraOn}>
+                      <VideocamOffIcon style={{ color: "silver" }} />
+                    </Button>
+                  </>
+                )}
+              </div>
+              <div className="col d-flex justify-content-center">
+                {micOn ? (
+                  <>
+                    <Button onClick={() => setMicOn(false)}>
+                      <MicIcon />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button onClick={() => setMicOn(true)}>
+                      <MicOffIcon style={{ color: "silver" }} />
+                    </Button>
+                  </>
+                )}
+              </div>
+              <div className="col d-flex justify-content-center">
+                {isOnCall ? (
+                  <>
+                    <Button onClick={() => setOnCall(false)}>
+                      <CallEndIcon style={{ color: "red" }} />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button onClick={requestCall}>
+                      <CallIcon />
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
