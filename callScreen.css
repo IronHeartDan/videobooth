@@ -1,0 +1,23 @@
+.home_main {
+    position: relative;
+  }
+  
+  .bigVideo {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: aqua;
+  }
+  
+  .smallVideo {
+    position: absolute;
+    right: 0;
+    background-color: chocolate;
+    width: 100px;
+    height: 150px;
+    border-radius: 5px;
+    margin: 10px;
+  }
+  
